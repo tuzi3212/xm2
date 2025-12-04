@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>City Decision Engine - 智能城市决策系统</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue.js 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F5F5F7;
+            color: #232325;
+            font-size: 1.07rem;
+            line-height: 1.8;
+            letter-spacing: 0.01em;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 3px; transition: background 0.3s;}
+        ::-webkit-scrollbar-thumb:hover { background: #a8a29e; }
+
+        /* === 侧边栏显示/隐藏及动画 === */
+        .sidebar {
+            transition: transform 0.35s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s;
+            transform: translateX(0);
+            will-change: transform;
+            z-index: 40;
+        }
+        .sidebar-hidden {
+            transform: translateX(-110%);
+            box-shadow: none !important;
+        }
+        .toggle-sidebar-button, button.md\:hidden {
+            font-size: 22px !important;
+            padding: 1.05rem !important;
+            background-color: #007AFF;
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background-color 0.3s, box-shadow 0.3s, transform 0.2s;
+            box-shadow: 0 2px 8px rgba(0,122,255,0.08);
+            outline: none;
+            display: none;
+            position: fixed;
+            top: 1rem;
+            left: 1rem;
+            z-index: 50;
+        }
+        .toggle-sidebar-button:hover, button.md\:hidden:hover {
+            background-color: #005BB5;
+            box-shadow: 0 4px 18px rgba(0,90,181,0.13);
+            transform: scale(1.08) rotate(-3deg);
+        }
+        .toggle-sidebar-button:focus, button.md\:hidden:focus {
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(0,90,181,0.23);
+            background-color: #003e7e;
+        }
+
+        /* === 图表容器和卡片布局优化 === */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            height: 320px;
+            max-height: 400px;
+            min-width: 0;
+            box-sizing: border-box;
+            overflow-x: auto;
+            transition: height 0.33s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.45s cubic-bezier(0.4,0,0.2,1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            will-change: height, box-shadow;
+        }
+        .card, .bg-white.p-5.rounded-2xl, .bg-white.p-6.rounded-2xl, .bg-amber-50\/50.p-6.rounded-2xl {
+            margin: 1rem 0;
+            padding: 1rem;
+            width: 100%;
+            box-sizing: border-box;
+            border-radius: 1.25rem;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+            transition: box-shadow 0.38s cubic-bezier(0.4,0,0.2,1), transform 0.38s cubic-bezier(0.19, 1, 0.22, 1), background-color 0.23s, border-color 0.22s;
+            will-change: transform, box-shadow, background-color, border-color;
+            background-clip: padding-box;
+        }
+        .card:hover, .bg-white.p-5.rounded-2xl:hover, .bg-white.p-6.rounded-2xl:hover, .bg-amber-50\/50.p-6.rounded-2xl:hover {
+            transform: translateY(-12px) scale(1.045);
+            box-shadow: 0 8px 28px rgba(0,122,255,0.09), 0 4px 16px rgba(0,0,0,0.11);
+            background-color: #f8fafc;
+            border-color: #B3D5FF;
+        }
+
+        /* === 按钮与输入框的交互效果 === */
+        button {
+            background-color: #007AFF;
+            color: #fff;
+            border-radius: 9999px;
+            padding: 0.85rem 1.25rem;
+            font-size: 1.08rem;
+            box-sizing: border-box;
+            border: 2px solid #007AFF;
+            transition: background-color 0.21s cubic-bezier(0.4,0,0.2,1), color 0.19s, transform 0.19s cubic-bezier(0.19, 1, 0.22, 1), box-shadow 0.23s, border-color 0.18s;
+            outline: none;
+            touch-action: manipulation;
+            will-change: transform, background-color, box-shadow, border-color;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+        }
+        button:hover, button:active {
+            background-color: #005BB5;
+            transform: translateY(-3px) scale(1.09);
+            box-shadow: 0 8px 22px rgba(0,90,181,0.16), 0 4px 16px rgba(0,122,255,0.14);
+            border-color: #005BB5;
+            color: #fff;
+        }
+        button:focus {
+            outline: none;
+            border-color: #007AFF;
+            box-shadow: 0 0 0 7px rgba(0,122,255,0.22), 0 4px 16px rgba(0,0,0,0.10);
+            background-color: #003e7e;
+        }
+
+        /* 强调色按钮（亮黄色，主色调变更为深灰色/蓝色时，accent按钮风格也适度调整） */
+        .btn-accent {
+            background-color: #1D1D1F;
+            color: #fff;
+            border-color: #1D1D1F;
+            box-shadow: 0 2px 8px rgba(29,29,31,0.08);
+            font-weight: 600;
+            transition: background 0.22s, background-color 0.22s, color 0.22s, box-shadow 0.16s, transform 0.18s cubic-bezier(0.4,0,0.2,1), border-color 0.22s;
+            will-change: transform, background, box-shadow, border-color;
+        }
+        .btn-accent:hover, .btn-accent:active {
+            background: #007AFF;
+            color: #fff;
+            box-shadow: 0 8px 22px rgba(0,122,255,0.13), 0 2px 8px rgba(0,0,0,0.10);
+            transform: translateY(-2px) scale(1.10);
+            border-color: #005BB5;
+        }
+        .btn-accent:focus {
+            outline: none;
+            border-color: #1D1D1F;
+            box-shadow: 0 0 0 5px rgba(0,90,181,0.23);
+        }
+
+        input[type="number"], input[type="text"], input[type="email"], textarea, select {
+            padding: 0.8rem 1.1rem;
+            border: 1.5px solid #007AFF;
+            border-radius: 0.5rem;
+            transition: border-color 0.21s cubic-bezier(0.4,0,0.2,1), box-shadow 0.22s, background-color 0.18s;
+            box-sizing: border-box;
+            font-size: 1.05rem;
+            touch-action: manipulation;
+            background-color: #fff;
+            color: #232325;
+            line-height: 1.7;
+        }
+        input[type="number"]:focus, input[type="text"]:focus, input[type="email"]:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #007AFF;
+            box-shadow: 0 0 0 5px rgba(0,122,255,0.19), 0 2px 10px rgba(0,122,255,0.09);
+            background-color: #f5faff;
+        }
+        input[type="number"]:hover, input[type="text"]:hover, input[type="email"]:hover, textarea:hover, select:hover {
+            border-color: #005BB5;
+            background-color: #f8fafc;
+        }
+
+        /* === 滚动和卡片过渡动画 === */
+        .list-move {
+            transition: transform 0.8s cubic-bezier(0.19, 1, 0.22, 1), box-shadow 0.35s, background-color 0.33s;
+            z-index: 10;
+        }
+        .list-enter-active,
+        .list-leave-active {
+            transition: all 0.58s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+        .list-enter-from,
+        .list-leave-to {
+            opacity: 0;
+            transform: scale(0.92) translateY(14px);
+        }
+        .list-leave-active {
+            position: absolute;
+            width: 100%;
+        }
+
+        /* === Utility === */
+        .tabular-nums { font-variant-numeric: tabular-nums; }
+
+        /* ========= 文本排版优化 ========= */
+        h1, h2, h3, h4, h5, h6 {
+            margin-top: 2.2rem;
+            margin-bottom: 1.1rem;
+            line-height: 1.22;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            word-break: break-word;
+            color: #1D1D1F;
+        }
+        h1 { font-size: 2.8rem; margin-top: 3rem; margin-bottom: 2rem; color: #1D1D1F; }
+        h2 { font-size: 2.2rem; margin-top: 2.4rem; margin-bottom: 1.5rem; color: #1D1D1F; }
+        h3 { font-size: 1.7rem; margin-top: 2rem; margin-bottom: 1.2rem; color: #1D1D1F; }
+        h4 { font-size: 1.25rem; margin-top: 1.5rem; margin-bottom: 1rem; color: #1D1D1F; }
+        h5, h6 { font-size: 1.1rem; margin-top: 1.1rem; margin-bottom: 0.7rem; color: #1D1D1F; }
+        p {
+            margin-bottom: 1.4em;
+            margin-top: 0;
+            line-height: 1.92;
+            font-size: 1.13rem;
+            text-align: justify;
+            word-break: break-word;
+            max-width: 60em;
+            color: #232325;
+            letter-spacing: 0.01em;
+        }
+        ul, ol { margin-bottom: 1.3em; padding-left: 2em; }
+        ul li, ol li { margin-bottom: 0.5em; line-height: 1.7; color: #232325; }
+        section, article, .space-y-8 > *+* { margin-top: 2.4rem; }
+        .text-4xl { font-size: 2.5rem !important; margin-bottom: 1.5rem; letter-spacing: -0.01em; line-height: 1.18; color: #1D1D1F !important; }
+        .text-xl, .font-bold.text-stone-700.text-xl { font-size: 1.32rem !important; margin-bottom: 1.1rem; color: #1D1D1F !important; }
+        .text-base { font-size: 1.12rem !important; margin-bottom: 1rem; color: #232325 !important; }
+        .mt-4, .mb-4, .mb-6 { margin-top: 1.3rem !important; margin-bottom: 1.5rem !important; }
+        /* 响应式下文本排版 */
+        @media (max-width: 1024px) {
+            h1 { font-size: 2.1rem !important; margin-top: 2rem !important; margin-bottom: 1.2rem !important; color: #1D1D1F !important;}
+            h2 { font-size: 1.55rem !important; margin-top: 1.6rem !important; margin-bottom: 1rem !important; color: #1D1D1F !important;}
+            h3 { font-size: 1.22rem !important; margin-top: 1.2rem !important; margin-bottom: 0.8rem !important; color: #1D1D1F !important;}
+            h4, h5, h6 { font-size: 1.08rem !important; margin-top: 1rem !important; margin-bottom: 0.6rem !important; color: #1D1D1F !important;}
+            p, .text-base { font-size: 1rem !important; margin-bottom: 1em; color: #232325 !important;}
+            .text-4xl { font-size: 1.7rem !important; color: #1D1D1F !important;}
+            .text-xl, .font-bold.text-stone-700.text-xl { font-size: 1.1rem !important; color: #1D1D1F !important;}
+            .mt-4, .mb-4, .mb-6 { margin-top: 0.8rem !important; margin-bottom: 1rem !important; }
+        }
+        @media (max-width: 768px) {
+            h1, h2, h3, h4, h5, h6 {
+                font-size: 1.08rem !important;
+                margin-top: 1.1rem !important;
+                margin-bottom: 0.7rem !important;
+                color: #1D1D1F !important;
+            }
+            h1 { font-size: 1.38rem !important; margin-top: 1.3rem !important; margin-bottom: 0.9rem !important; color: #1D1D1F !important;}
+            h2 { font-size: 1.18rem !important; color: #1D1D1F !important;}
+            h3 { font-size: 1.08rem !important; color: #1D1D1F !important;}
+            h4, h5, h6 { font-size: 1.02rem !important; color: #1D1D1F !important;}
+            p, .text-base { font-size: 0.97rem !important; margin-bottom: 0.9em; color: #232325 !important;}
+            .text-4xl { font-size: 1.15rem !important; color: #1D1D1F !important;}
+            .text-xl, .font-bold.text-stone-700.text-xl { font-size: 1rem !important; color: #1D1D1F !important;}
+            .mt-4, .mb-4, .mb-6 { margin-top: 0.6rem !important; margin-bottom: 0.7rem !important; }
+        }
+        @media (max-width: 480px) {
+            h1, h2, h3, h4, h5, h6 {
+                font-size: 0.99rem !important;
+                margin-top: 0.6rem !important;
+                margin-bottom: 0.5rem !important;
+                color: #1D1D1F !important;
+            }
+            h1 { font-size: 1.08rem !important; margin-top: 0.7rem !important; margin-bottom: 0.5rem !important; color: #1D1D1F !important;}
+            p, .text-base { font-size: 0.92rem !important; color: #232325 !important;}
+            .text-4xl { font-size: 1rem !important; color: #1D1D1F !important;}
+        }
+
+        /* === 优化响应式布局，确保所有栏目都能自适应 === */
+        @media (max-width: 1024px) {
+            /* 侧边栏和主内容区域 */
+            #app, .main-content {
+                flex-direction: column !important;
+            }
+
+            .sidebar {
+                min-width: 0 !important;
+                max-width: 100vw !important;
+                z-index: 50;
+            }
+
+            .toggle-sidebar-button {
+                display: block !important;
+                font-size: 24px !important;
+                min-width: 50px !important;
+                min-height: 50px !important;
+                padding: 1rem !important;
+                background-color: #007AFF;
+                border-radius: 50%;
+                position: fixed;
+                top: 1rem;
+                left: 1rem;
+                z-index: 50;
+                box-shadow: 0 2px 8px rgba(0,122,255,0.08);
+            }
+
+            .main-content {
+                padding-bottom: 1.5rem !important;
+                overflow-y: auto !important;
+                flex-direction: column !important;
+            }
+
+            .card, .bg-white.p-5.rounded-2xl, .bg-white.p-6.rounded-2xl, .bg-amber-50\/50.p-6.rounded-2xl {
+                width: 100% !important;
+                margin-bottom: 1rem !important;
+                padding: 1rem !important;
+                box-sizing: border-box;
+            }
+
+            /* 优化雷达图容器 */
+            .chart-container {
+                height: 220px !important;
+                width: 100% !important;
+                margin-top: 1.5rem !important;
+            }
+
+            #radarChart {
+                width: 100% !important;
+                height: 220px !important;
+            }
+
+            /* 调整卡片内容 */
+            .grid.grid-cols-2.gap-4 {
+                grid-template-columns: 1fr !important;
+                gap: 0.5rem !important;
+            }
+
+            .space-y-8 > *+* {
+                margin-top: 1.5rem !important;
+            }
+        }
+
+        /* 优化 Chart.js 图表的显示，确保雷达图在不同数据下不会畸形 */
+        @media (max-width: 768px) {
+            .chart-container {
+                width: 100% !important;
+                height: 200px !important; /* 调整图表高度 */
+                margin-top: 1.5rem !important;
+            }
+            #radarChart {
+                width: 100% !important;
+                height: 200px !important; /* 调整图表高度 */
+            }
+        }
+
+        /* 进一步优化手机端小屏显示 */
+        @media (max-width: 480px) {
+            .chart-container { height: 120px !important; }
+            #radarChart { height: 120px !important; }
+        }
+    </style>
+</head>
+<body class="h-screen overflow-hidden">
+
+    <div id="app" class="flex w-full h-full flex-col md:flex-row min-h-0 min-w-0">
+
+        <!-- === SIDEBAR: CONTROLS === -->
+        <!-- 侧边栏 Toggle 按钮（小屏幕固定左上角） -->
+        <button 
+            class="toggle-sidebar-button md:hidden" 
+            @click="toggleSidebar" 
+            v-if="window.innerWidth < 768 && !sidebarVisible"
+            aria-label="显示菜单"
+        >
+            ☰
+        </button>
+        <aside
+            class="sidebar flex-shrink-0 bg-white border-r border-stone-200 flex flex-col h-full z-30 shadow-xl overflow-hidden md:block"
+            :class="{
+                'w-full': window.innerWidth < 768,
+                'md:w-80': window.innerWidth >= 768,
+                'sidebar-hidden': !sidebarVisible && window.innerWidth < 768,
+                'sidebar-visible': sidebarVisible && window.innerWidth < 768,
+                'md:block': true
+            }"
+            v-show="sidebarVisible || window.innerWidth >= 768"
+        >
+            <!-- Sidebar close button for iPhone/small screen -->
+            <button 
+                class="toggle-sidebar-button md:hidden" 
+                @click="toggleSidebar" 
+                v-if="window.innerWidth < 768 && sidebarVisible"
+                aria-label="关闭菜单"
+            >✕</button>
+            <!-- Header -->
+            <div class="p-6 border-b border-stone-100 bg-stone-50">
+                <h1 class="text-xl font-bold flex items-center gap-2" style="color:#1D1D1F;">
+                    <span class="text-2xl" style="color:#007AFF;">❖</span> 
+                    决策引擎 <span class="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full uppercase tracking-wider border border-blue-200" style="background-color:#E5F0FF;color:#007AFF;border-color:#B3D5FF;">Pro</span>
+                </h1>
+                <p class="text-xs" style="color:#666;">调整权重，让算法为您定制旅程。</p>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                
+                <!-- Filter Group -->
+                <div class="space-y-4">
+                    <h3 class="text-xs font-bold uppercase tracking-widest flex items-center gap-2" style="color:#1D1D1F;">
+                        <span>🔍</span> 初步筛选
+                    </h3>
+                    
+                    <div class="space-y-3">
+                        <!-- Region Filter -->
+                        <div>
+                            <label class="text-xs font-semibold text-stone-500 block mb-1.5 ml-1">地理区域</label>
+                            <div class="relative">
+                                <select v-model="filters.region" class="w-full text-sm appearance-none bg-stone-50 border border-stone-200 text-stone-700 py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-shadow cursor-pointer">
+                                    <option value="all">🌏 全域展示 (All)</option>
+                                    <option value="North">❄️ 北方地区</option>
+                                    <option value="South">🌴 南方地区</option>
+                                    <option value="East">🏙️ 华东沿海</option>
+                                    <option value="West">🏔️ 西部内陆</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-stone-500">
+                                    <span class="text-xs">▼</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Type Filter -->
+                        <div>
+                            <label class="text-xs font-semibold text-stone-500 block mb-1.5 ml-1">城市类型</label>
+                            <div class="flex flex-wrap gap-2">
+                        <button 
+                            v-for="type in ['全部', '历史', '现代', '自然']" 
+                            :key="type"
+                            @click="filters.type = type"
+                            class="text-xs px-3 py-1.5 rounded-full border transition-all duration-200"
+                            :class="filters.type === type ? 'bg-[#007AFF] text-white border-[#007AFF] shadow-sm' : 'bg-white text-[#1D1D1F] border-stone-200 hover:border-[#007AFF] hover:text-[#007AFF]'"
+                        >
+                            {{ type }}
+                        </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="h-px bg-stone-100"></div>
+
+                <!-- Weights Group -->
+                <div class="space-y-4">
+                    <div class="flex justify-between items-end">
+                        <h3 class="text-xs font-bold uppercase tracking-widest flex items-center gap-2" style="color:#1D1D1F;">
+                            <span>🎛️</span> 决策权重
+                        </h3>
+                        <button @click="resetPreferences" class="text-[10px] font-medium underline decoration-blue-200 hover:decoration-blue-600 underline-offset-2 transition-all" style="color:#007AFF;">重置默认</button>
+                    </div>
+                    
+                    <div class="space-y-5">
+                        <div v-for="(weight, key) in preferences" :key="key" class="group">
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="text-sm font-semibold text-stone-700 flex items-center gap-2 cursor-pointer" @click="focusSlider(key)">
+                                    <span class="text-base filter grayscale group-hover:grayscale-0 transition-all">{{ getIcon(key) }}</span> 
+                                    {{ labelMap[key] }}
+                                </label>
+                                <span class="text-xs font-mono font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-100 tabular-nums" style="color:#007AFF;">
+                                    {{ weight }}%
+                                </span>
+                            </div>
+                            <input 
+                                :id="'slider-'+key"
+                                type="range" 
+                                v-model.number="preferences[key]" 
+                                min="0" max="100" step="5" 
+                                class="w-full h-1.5 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-[#007AFF]"
+                            >
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer Status -->
+            <div class="p-3 bg-stone-50 border-t border-stone-200 text-center">
+                <p class="text-[10px] text-stone-400 font-medium">
+                    已分析 <span class="text-amber-600 font-bold">{{ filteredCities.length }}</span> / {{ cities.length }} 个目的地
+                </p>
+            </div>
+        </aside>
+
+        <!-- === MAIN CONTENT === -->
+        <main class="main-content flex-1 flex flex-col md:flex-row overflow-hidden bg-stone-50/30 min-h-0 min-w-0">
+            <!-- LIST COLUMN: Rankings -->
+            <div class="w-full md:w-5/12 lg:w-4/12 flex flex-col border-r border-stone-200 bg-white/80 backdrop-blur z-10 min-h-0">
+                <div class="p-4 border-b border-stone-100 sticky top-0 z-20 bg-white/95">
+                    <h2 class="font-bold flex items-center gap-2" style="color:#1D1D1F;">
+                        <span>🏆</span> 智能排行
+                    </h2>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar relative min-h-0">
+                    <transition-group name="list">
+                        <div 
+                            v-for="(city, index) in rankedCities" 
+                            :key="city.id"
+                            @click="selectCity(city)"
+                            class="relative p-3 rounded-xl border-2 transition-all cursor-pointer group hover:shadow-md transform transition duration-300 ease-in-out hover:scale-105"
+                            :class="selectedCity?.id === city.id 
+                                ? 'bg-blue-50 border-[#007AFF] ring-1 ring-blue-100 z-10' 
+                                : 'bg-white border-transparent hover:border-[#007AFF]'"
+                        >
+                            <div class="flex items-center gap-3">
+                                <!-- Rank Badge -->
+                                <div 
+                                    class="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-lg font-bold text-sm transition-all duration-300 font-mono"
+                                    :class="index === 0 
+                                        ? 'bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-200 scale-105' 
+                                        : index < 3 ? 'bg-stone-100 text-[#1D1D1F]' : 'text-stone-300'"
+                                >
+                                    {{ index + 1 }}
+                                </div>
+
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <h3 class="font-bold text-stone-800 truncate">{{ city.name }}</h3>
+                                        <div class="flex items-center gap-1">
+                                            <span class="text-lg font-black tabular-nums" style="color:#007AFF;">
+                                                <animated-number :value="Math.round(city.matchScore)"></animated-number>
+                                            </span>
+                                            <span class="text-[10px] text-stone-400 font-medium pt-1">分</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Score Bar -->
+                                    <div class="w-full h-1.5 bg-stone-100 rounded-full overflow-hidden flex">
+                                        <div 
+                                            class="h-full" 
+                                            :style="{ width: city.matchScore + '%', background: '#007AFF', opacity: 0.8 }"
+                                            class="transition-all duration-700 ease-out rounded-full"
+                                        ></div>
+                                    </div>
+                                    
+                                    <div class="mt-1.5 flex gap-2 text-[10px] text-stone-400 font-medium">
+                                        <span class="bg-stone-50 px-1.5 py-0.5 rounded border border-stone-100">{{ city.regionName }}</span>
+                                        <span class="bg-stone-50 px-1.5 py-0.5 rounded border border-stone-100">{{ city.type }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </transition-group>
+
+                    <!-- Empty State -->
+                    <div v-if="filteredCities.length === 0" class="absolute inset-0 flex flex-col items-center justify-center text-stone-400">
+                        <span class="text-4xl mb-3 grayscale opacity-50">🔭</span>
+                        <p class="text-sm font-medium">未找到符合条件的城市</p>
+                        <button @click="resetFilters" class="mt-3 text-xs btn-accent px-3 py-1.5 rounded-full transition-colors">
+                            清除筛选条件
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DETAIL COLUMN: Analysis -->
+            <div class="flex-1 overflow-y-auto bg-stone-50 relative custom-scrollbar min-h-0">
+                <div v-if="selectedCity" class="p-6 md:p-10 max-w-4xl mx-auto space-y-8 min-h-full">
+                    
+                    <!-- Intro Header -->
+                    <section class="animate-fade-in">
+                        <div class="flex flex-col md:flex-row justify-between items-start gap-4">
+                            <div>
+                                <h2 class="text-4xl font-black mb-3 tracking-tight" style="color:#1D1D1F;">{{ selectedCity.name }}</h2>
+                                <p class="text-base leading-relaxed max-w-2xl font-light" style="color:#444;">
+                                    {{ selectedCity.desc }}
+                                </p>
+                                <div class="mt-4 flex flex-wrap gap-2">
+                                    <span v-for="tag in selectedCity.tags" :key="tag" class="px-3 py-1 bg-white border border-stone-200 rounded-full text-xs font-semibold text-[#007AFF] shadow-sm flex items-center gap-1">
+                                        <span style="color:#007AFF;">#</span> {{ tag }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="hidden md:block text-right bg-white p-4 rounded-2xl border border-stone-100 shadow-sm">
+                                <div class="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">综合匹配指数</div>
+                                <div class="text-5xl font-black tabular-nums tracking-tighter" style="color:#007AFF;">
+                                    <animated-number :value="Math.round(selectedCity.matchScore)"></animated-number>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Analysis Grid -->
+                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        
+                        <!-- Visualization Card -->
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex flex-col">
+                            <h4 class="text-xs font-bold uppercase tracking-widest mb-6 border-b border-stone-50 pb-2" style="color:#1D1D1F;">多维能力模型分析</h4>
+                            <div class="chart-container flex-1 flex items-center justify-center">
+                                <canvas id="radarChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Metrics & Tools -->
+                        <div class="space-y-6 flex flex-col">
+                            
+                            <!-- Info Cards -->
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm transition-transform hover:-translate-y-1">
+                                    <div class="text-xs text-stone-400 mb-1 font-medium">气温 & 气候</div>
+                                    <div class="font-bold text-[#1D1D1F] text-xl">{{ selectedCity.temp }}</div>
+                                    <div class="text-xs text-stone-500 mt-1">{{ selectedCity.weather }}</div>
+                                </div>
+                                <div class="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm transition-transform hover:-translate-y-1">
+                                    <div class="text-xs text-stone-400 mb-1 font-medium">消费水平</div>
+                                    <div class="font-bold text-[#007AFF] text-xl tracking-widest">{{ selectedCity.budget }}</div>
+                                    <div class="text-xs text-stone-500 mt-1">基础物价指数</div>
+                                </div>
+                            </div>
+
+                            <!-- Calculator Tool -->
+                            <div class="bg-blue-50/50 p-6 rounded-2xl border border-blue-100 flex-1 flex flex-col justify-center">
+                                <div class="flex justify-between items-center mb-5">
+                                    <h4 class="font-bold flex items-center gap-2" style="color:#1D1D1F;">
+                                        <span>🧮</span> 预算计算器
+                                    </h4>
+                                    <span class="text-[10px] font-bold bg-white" style="color:#007AFF;border:1px solid #B3D5FF;px-2 py-1 rounded">预估</span>
+                                </div>
+                                
+                                <div class="mb-6">
+                                    <div class="flex justify-between text-sm mb-2">
+                                        <span class="font-medium" style="color:#1D1D1F;">计划游玩天数</span>
+                                        <span class="font-bold bg-white px-2 py-0.5 rounded border border-blue-100" style="color:#007AFF;">{{ tripDays }} 天</span>
+                                    </div>
+                                    <input type="range" v-model.number="tripDays" min="1" max="15" class="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-[#007AFF]">
+                                    <div class="flex justify-between mt-1 text-[10px] text-stone-400">
+                                        <span>1天</span>
+                                        <span>15天</span>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-between items-end pt-5 border-t border-blue-200/50">
+                                    <span class="text-xs text-stone-500 font-medium">预计总花费 (人均)</span>
+                                    <span class="text-2xl font-black tabular-nums" style="color:#1D1D1F;">
+                                        <span class="text-sm font-normal text-stone-400 mr-1">¥</span><animated-number :value="estimatedCost"></animated-number>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Spots List -->
+                            <div>
+                                <h4 class="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3">必去打卡点</h4>
+                                <div class="flex flex-wrap gap-2">
+                                    <div v-for="spot in selectedCity.spots" :key="spot" class="flex items-center gap-1.5 px-3 py-2 bg-white rounded-lg border border-stone-100 text-xs font-medium text-[#1D1D1F] shadow-sm">
+                                        <span style="color:#007AFF;">📍</span> {{ spot }}
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        const { createApp, ref, reactive, computed, watch, onMounted, nextTick } = Vue;
+
+        // === Component: Animated Number Tweening ===
+        const AnimatedNumber = {
+            props: {
+                value: { type: Number, required: true },
+                duration: { type: Number, default: 600 }
+            },
+            template: '<span>{{ displayValue }}</span>',
+            setup(props) {
+                const displayValue = ref(props.value);
+                
+                watch(() => props.value, (newVal, oldVal) => {
+                    if (oldVal === undefined) {
+                        displayValue.value = newVal;
+                        return;
+                    }
+                    const startValue = displayValue.value;
+                    const change = newVal - startValue;
+                    let startTimestamp = null;
+                    
+                    const step = (timestamp) => {
+                        if (!startTimestamp) startTimestamp = timestamp;
+                        const progress = timestamp - startTimestamp;
+                        const percentage = Math.min(progress / props.duration, 1);
+                        const ease = 1 - Math.pow(1 - percentage, 4); // Ease Out Quart
+                        displayValue.value = Math.round(startValue + (change * ease));
+                        
+                        if (progress < props.duration) window.requestAnimationFrame(step);
+                    };
+                    window.requestAnimationFrame(step);
+                });
+
+                return { displayValue };
+            }
+        };
+
+        const app = createApp({
+            components: { 'animated-number': AnimatedNumber },
+            setup() {
+                // --- 1. Data Store: 12 Cities Data (Simulating API Response) ---
+                const cities = [
+                    { 
+                        id: 1, name: 'Chengdu', nameCN: '成都', region: 'West', regionName: '西部', type: '现代',
+                        temp: '16°C', weather: '湿润/多云', budget: '¥¥', baseCost: 400,
+                        desc: '天府之国，慢生活的典范。在这里，火锅是信仰，喝茶是日常。适合想要彻底放松身心的旅行者。', 
+                        tags: ['美食', '大熊猫', '安逸'],
+                        spots: ['大熊猫基地', '春熙路', '宽窄巷子', '建设路'], 
+                        scores: { cost: 85, food: 98, culture: 85, nature: 70, safety: 90 } 
+                    },
+                    { 
+                        id: 2, name: 'Beijing', nameCN: '北京', region: 'North', regionName: '北方', type: '历史',
+                        temp: '12°C', weather: '干燥/晴朗', budget: '¥¥¥', baseCost: 600,
+                        desc: '三千年古都，现代中国的核心。宏伟的皇家建筑与充满烟火气的胡同共存，是感受中华文明厚度的首选。', 
+                        tags: ['故宫', '胡同', '首都'],
+                        spots: ['故宫博物院', '八达岭长城', '环球影城', '颐和园'], 
+                        scores: { cost: 50, food: 88, culture: 98, nature: 60, safety: 95 } 
+                    },
+                    { 
+                        id: 3, name: 'Sanya', nameCN: '三亚', region: 'South', regionName: '南方', type: '自然',
+                        temp: '28°C', weather: '热带海洋', budget: '¥¥¥¥', baseCost: 800,
+                        desc: '拥有中国最迷人的热带海岸线。无论是冲浪潜水还是躺平度假，这里都能满足你对海岛的所有幻想。', 
+                        tags: ['海滩', '度假', '潜水'],
+                        spots: ['亚龙湾', '蜈支洲岛', '后海村', '免税城'], 
+                        scores: { cost: 30, food: 75, culture: 60, nature: 95, safety: 85 } 
+                    },
+                    { 
+                        id: 4, name: 'Lanzhou', nameCN: '兰州', region: 'West', regionName: '西部', type: '历史',
+                        temp: '10°C', weather: '干燥/大风', budget: '¥', baseCost: 300,
+                        desc: '黄河穿城而过的豪迈城市。一碗牛肉面开启一天，这里是探索大西北环线的最佳起点，性价比极高。', 
+                        tags: ['牛肉面', '黄河', '中转站'],
+                        spots: ['中山桥', '甘肃博物馆', '白塔山', '正宁路夜市'], 
+                        scores: { cost: 95, food: 90, culture: 75, nature: 80, safety: 80 } 
+                    },
+                    { 
+                        id: 5, name: 'Shanghai', nameCN: '上海', region: 'East', regionName: '华东', type: '现代',
+                        temp: '15°C', weather: '湿润', budget: '¥¥¥¥', baseCost: 750,
+                        desc: '魔都，极致繁华与海派风情的交响。外滩的万国建筑博览群与陆家嘴的天际线隔江相望。', 
+                        tags: ['外滩', '迪士尼', '摩登'],
+                        spots: ['外滩', '陆家嘴三件套', '迪士尼', '武康路'], 
+                        scores: { cost: 40, food: 92, culture: 88, nature: 50, safety: 95 } 
+                    },
+                    { 
+                        id: 6, name: 'Guilin', nameCN: '桂林', region: 'South', regionName: '南方', type: '自然',
+                        temp: '20°C', weather: '多雨/湿润', budget: '¥¥', baseCost: 450,
+                        desc: '桂林山水甲天下。喀斯特地貌的巅峰之作，乘一叶竹筏泛舟漓江，仿佛置身于水墨画卷之中。', 
+                        tags: ['山水', '漓江', '田园'],
+                        spots: ['漓江漂流', '象鼻山', '阳朔西街', '龙脊梯田'], 
+                        scores: { cost: 80, food: 80, culture: 70, nature: 98, safety: 85 } 
+                    },
+                    { 
+                        id: 7, name: 'Xian', nameCN: '西安', region: 'West', regionName: '西部', type: '历史',
+                        temp: '14°C', weather: '干燥', budget: '¥¥', baseCost: 400,
+                        desc: '十三朝古都，世界历史名城。兵马俑的震撼与回民街的烟火气，交织出一座厚重而鲜活的城市。', 
+                        tags: ['兵马俑', '碳水之都', '大唐'],
+                        spots: ['兵马俑', '大唐不夜城', '古城墙', '陕西历史博物馆'], 
+                        scores: { cost: 75, food: 95, culture: 99, nature: 50, safety: 85 } 
+                    },
+                    { 
+                        id: 8, name: 'Chongqing', nameCN: '重庆', region: 'West', regionName: '西部', type: '现代',
+                        temp: '18°C', weather: '多雾/湿润', budget: '¥¥', baseCost: 400,
+                        desc: '8D魔幻山城，轻轨穿楼而过。这里地形复杂，夜景璀璨，是赛博朋克风格的现实写照。', 
+                        tags: ['火锅', '8D魔幻', '夜景'],
+                        spots: ['洪崖洞', '解放碑', '李子坝轻轨', '长江索道'], 
+                        scores: { cost: 80, food: 96, culture: 75, nature: 70, safety: 85 } 
+                    },
+                    { 
+                        id: 9, name: 'Hangzhou', nameCN: '杭州', region: 'East', regionName: '华东', type: '自然',
+                        temp: '16°C', weather: '湿润/宜人', budget: '¥¥¥', baseCost: 550,
+                        desc: '“上有天堂，下有苏杭”。西湖的断桥残雪，龙井的茶香，这里是江南温婉气质的极致代表。', 
+                        tags: ['西湖', '江南', '茶文化'],
+                        spots: ['西湖', '灵隐寺', '西溪湿地', '龙井村'], 
+                        scores: { cost: 60, food: 85, culture: 90, nature: 95, safety: 95 } 
+                    },
+                    { 
+                        id: 10, name: 'Xiamen', nameCN: '厦门', region: 'South', regionName: '南方', type: '自然',
+                        temp: '22°C', weather: '海风/舒适', budget: '¥¥¥', baseCost: 500,
+                        desc: '文艺清新的海上花园。鼓浪屿的万国建筑，环岛路的椰风海韵，适合漫无目的地闲逛。', 
+                        tags: ['鼓浪屿', '文艺', '海鲜'],
+                        spots: ['鼓浪屿', '厦门大学', '环岛路', '曾厝垵'], 
+                        scores: { cost: 65, food: 88, culture: 75, nature: 92, safety: 90 } 
+                    },
+                    { 
+                        id: 11, name: 'Harbin', nameCN: '哈尔滨', region: 'North', regionName: '北方', type: '自然',
+                        temp: '-5°C', weather: '寒冷/冰雪', budget: '¥¥', baseCost: 450,
+                        desc: '“东方莫斯科”。冰雪大世界的梦幻，中央大街的俄式风情，是冬日里最浪漫的童话世界。', 
+                        tags: ['冰雪', '俄式风情', '滑雪'],
+                        spots: ['冰雪大世界', '中央大街', '圣索菲亚大教堂', '松花江'], 
+                        scores: { cost: 75, food: 85, culture: 80, nature: 98, safety: 80 } 
+                    },
+                    { 
+                        id: 12, name: 'Lhasa', nameCN: '拉萨', region: 'West', regionName: '西部', type: '历史',
+                        temp: '8°C', weather: '高原/阳光', budget: '¥¥¥', baseCost: 500,
+                        desc: '日光城，心灵的归宿。布达拉宫的金顶在阳光下熠熠生辉，信仰的力量在这里触手可及。', 
+                        tags: ['信仰', '高原', '布达拉宫'],
+                        spots: ['布达拉宫', '大昭寺', '八廓街', '纳木错'], 
+                        scores: { cost: 60, food: 70, culture: 98, nature: 98, safety: 75 } 
+                    }
+                ];
+
+                const labelMap = {
+                    cost: '性价比', food: '美食指数', culture: '文化底蕴', nature: '自然风光', safety: '城市设施'
+                };
+
+                // --- 2. State Management ---
+                const preferences = reactive({ cost: 50, food: 50, culture: 50, nature: 50, safety: 50 });
+                const filters = reactive({ region: 'all', type: '全部' });
+                const tripDays = ref(5);
+                const selectedCity = ref(null); // Init via Watcher
+                let chartInstance = null;
+                // 响应式侧边栏
+                const sidebarVisible = ref(window.innerWidth >= 768);
+                // 用于响应式显示按钮
+                const updateSidebarOnResize = () => {
+                    if (window.innerWidth < 768) {
+                        sidebarVisible.value = false;
+                    } else {
+                        sidebarVisible.value = true;
+                    }
+                };
+                const toggleSidebar = () => {
+                    sidebarVisible.value = !sidebarVisible.value;
+                };
+
+                // --- 3. Computed Logic ---
+                // Filter Cities
+                const filteredCities = computed(() => {
+                    return cities.filter(city => {
+                        const matchRegion = filters.region === 'all' || city.region === filters.region;
+                        const matchType = filters.type === '全部' || city.type === filters.type;
+                        return matchRegion && matchType;
+                    });
+                });
+
+                // Rank Cities (Weighted Algo)
+                const rankedCities = computed(() => {
+                    return filteredCities.value.map(city => {
+                        let totalScore = 0;
+                        let totalWeight = 0;
+                        for (const key in preferences) {
+                            const weight = preferences[key];
+                            const score = city.scores[key];
+                            totalScore += score * weight;
+                            totalWeight += weight;
+                        }
+                        const finalScore = totalWeight === 0 ? 0 : (totalScore / totalWeight);
+                        
+                        return { ...city, name: city.nameCN, matchScore: finalScore };
+                    }).sort((a, b) => b.matchScore - a.matchScore);
+                });
+
+                // Budget Calc
+                const estimatedCost = computed(() => {
+                    if (!selectedCity.value) return 0;
+                    return selectedCity.value.baseCost * tripDays.value;
+                });
+
+        // --- 4. Chart.js Controller ---
+        // 响应式图表自适应宽度与高度（不同屏幕尺寸）
+        const getResponsiveChartSize = () => {
+            // 返回 {width, height}，可根据屏幕宽度自适应
+            const w = window.innerWidth;
+            if (w < 480) return { width: 160, height: 120 };
+            if (w < 768) return { width: 220, height: 200 };
+            if (w < 1024) return { width: 370, height: 220 };
+            return { width: 520, height: 320 };
+        };
+        // 统一调整所有城市雷达图显示，确保一致性
+        const updateChart = () => {
+            const ctx = document.getElementById('radarChart');
+            if (!ctx || !selectedCity.value) return;
+
+            // 动态调整canvas大小以适配不同屏幕
+            const { width, height } = getResponsiveChartSize();
+            ctx.width = width;
+            ctx.height = height;
+
+            // 保证所有城市的评分顺序和数量一致
+            const dataValues = [
+                selectedCity.value.scores.cost,
+                selectedCity.value.scores.food,
+                selectedCity.value.scores.culture,
+                selectedCity.value.scores.nature,
+                selectedCity.value.scores.safety
+            ];
+
+            // 平均基准数据：取所有城市各项平均值，确保所有城市基准一致
+            const allScores = cities.map(city => city.scores);
+            const avg = key => Math.round(allScores.reduce((sum, s) => sum + s[key], 0) / allScores.length);
+            const baselineData = [
+                avg('cost'),
+                avg('food'),
+                avg('culture'),
+                avg('nature'),
+                avg('safety')
+            ];
+
+            // 动画参数，数据变化时平滑过渡
+            const chartAnimation = { duration: 900, easing: 'easeOutCubic' };
+
+            if (chartInstance) {
+                // 动态更新数据与label，触发动画
+                chartInstance.data.datasets[0].label = selectedCity.value.name;
+                chartInstance.options.animation = chartAnimation;
+                chartInstance.data.datasets[0].data = dataValues;
+                chartInstance.data.datasets[1].data = baselineData;
+                chartInstance.data.datasets[0].tension = 0;
+                chartInstance.data.datasets[0].pointRadius = 4;
+                chartInstance.data.datasets[0].pointHoverRadius = 6;
+                chartInstance.update();
+            } else {
+                chartInstance = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['性价比', '美食', '文化', '自然', '设施'],
+                        datasets: [{
+                            label: selectedCity.value.name,
+                            data: dataValues,
+                            fill: true,
+                            backgroundColor: 'rgba(0, 122, 255, 0.16)',
+                            borderColor: '#007AFF',
+                            pointBackgroundColor: '#fff',
+                            pointBorderColor: '#007AFF',
+                            pointHoverBackgroundColor: '#005BB5',
+                            pointHoverBorderColor: '#fff',
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            tension: 0
+                        }, {
+                            label: '平均基准',
+                            data: baselineData,
+                            fill: true,
+                            backgroundColor: 'rgba(29,29,31,0.05)',
+                            borderColor: 'rgba(29,29,31,0.13)',
+                            pointRadius: 0,
+                            tension: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            r: {
+                                angleLines: { color: '#f5f5f4' },
+                                grid: { color: '#e7e5e4' },
+                                pointLabels: { font: { size: 13, family: "'Inter', sans-serif" }, color: '#78716c' },
+                                suggestedMin: 0, suggestedMax: 100,
+                                ticks: { display: false }
+                            }
+                        },
+                        plugins: {
+                            legend: { position: 'bottom', labels: { usePointStyle: true, font: { family: "'Inter'" }, color: '#57534e' } },
+                            tooltip: {
+                                enabled: true,
+                                backgroundColor: '#fff',
+                                titleColor: '#007AFF',
+                                bodyColor: '#232325',
+                                borderColor: '#B3D5FF',
+                                borderWidth: 1,
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label;
+                                        const value = context.raw;
+                                        const datasetLabel = context.dataset.label;
+                                        let detail = '';
+                                        switch (label) {
+                                            case '性价比':
+                                                detail = '（花费与体验的平衡）';
+                                                break;
+                                            case '美食':
+                                                detail = '（当地美食丰富度）';
+                                                break;
+                                            case '文化':
+                                                detail = '（历史与文化底蕴）';
+                                                break;
+                                            case '自然':
+                                                detail = '（自然景观和环境）';
+                                                break;
+                                            case '设施':
+                                                detail = '（安全与基础设施）';
+                                                break;
+                                            default:
+                                                detail = '';
+                                        }
+                                        return `${datasetLabel} - ${label}${detail}: ${value}%`;
+                                    }
+                                }
+                            }
+                        },
+                        animation: chartAnimation
+                    }
+                });
+            }
+        };
+
+                // --- 5. Interactions ---
+                const selectCity = (city) => { selectedCity.value = city; };
+                const resetPreferences = () => { Object.keys(preferences).forEach(k => preferences[k] = 50); };
+                const resetFilters = () => { filters.region = 'all'; filters.type = '全部'; };
+                const getIcon = (key) => { return { cost: '💰', food: '🍜', culture: '🏛️', nature: '🌲', safety: '🚦' }[key]; };
+                const focusSlider = (key) => { document.getElementById('slider-'+key)?.focus(); };
+
+                // --- 6. Watchers ---
+                watch(() => selectedCity.value, () => nextTick(() => updateChart()));
+
+                // Auto-selection Logic: Ensure a city is always selected if available
+                watch(rankedCities, (newVal) => {
+                    if (newVal.length > 0) {
+                        // Keep current if still in list, otherwise select top
+                        if (!selectedCity.value || !newVal.find(c => c.id === selectedCity.value.id)) {
+                            selectCity(newVal[0]);
+                        }
+                    } else {
+                        selectedCity.value = null;
+                    }
+                }, { immediate: true });
+
+                onMounted(() => {
+                    window.addEventListener('resize', () => {
+                        // 响应式调整图表大小
+                        if (chartInstance) {
+                            // 重新设置canvas尺寸并更新
+                            const ctx = document.getElementById('radarChart');
+                            if (ctx) {
+                                const { width, height } = getResponsiveChartSize();
+                                ctx.width = width;
+                                ctx.height = height;
+                            }
+                            chartInstance.resize();
+                        }
+                        updateSidebarOnResize();
+                    });
+                    updateSidebarOnResize();
+                });
+
+                return {
+                    cities, filteredCities, rankedCities,
+                    labelMap, preferences, filters,
+                    selectedCity, tripDays, estimatedCost,
+                    selectCity, resetPreferences, resetFilters, getIcon, focusSlider,
+                    sidebarVisible, toggleSidebar,
+                    window // 让模板可以访问window.innerWidth
+                };
+            }
+        });
+        
+        app.mount('#app');
+    </script>
+    <style>
+    /* ========== Flexbox布局优化 ========== */
+    #app {
+        display: flex;
+        width: 100vw;
+        height: 100vh;
+        min-height: 0;
+        min-width: 0;
+        flex-direction: row;
+        font-family: 'Inter', sans-serif;
+    }
+    .sidebar {
+        min-width: 230px;
+        max-width: 350px;
+        min-height: 0;
+    }
+    .main-content {
+        display: flex;
+        flex: 1 1 0%;
+        min-width: 0;
+        min-height: 0;
+        flex-direction: row;
+    }
+    </style>
+
+</body>
+</html>
+
+        /* 调整布局，确保在小屏幕下主内容区和侧边栏显示正常 */
+        @media (max-width: 768px) {
+            #app {
+                flex-direction: column !important;
+            }
+
+            .sidebar {
+                width: 100% !important;
+                transform: translateX(0) !important;
+                box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08) !important;
+                display: block !important;
+            }
+
+            /* 确保按钮和侧边栏在小屏幕下能够显示 */
+            .toggle-sidebar-button {
+                display: block !important;
+                font-size: 24px !important;
+                padding: 1rem !important;
+                min-width: 50px !important;
+                min-height: 50px !important;
+            }
+
+            /* 主内容区调整为列布局 */
+            .main-content {
+                flex-direction: column !important;
+                padding-bottom: 1.5rem !important;
+                overflow-y: auto !important;
+            }
+
+            /* 优化卡片和图表容器的大小 */
+            .chart-container, .card {
+                width: 100% !important;
+                margin-bottom: 1rem !important;
+                padding: 1rem !important;
+                box-sizing: border-box;
+            }
+
+            /* 优化雷达图的显示 */
+            #radarChart {
+                width: 100% !important;
+                height: 220px !important;
+            }
+
+            /* 调整排名的列表显示 */
+            .flex-1 {
+                flex: 1 !important;
+                overflow-y: auto !important;
+            }
+
+            /* 优化各个按钮的尺寸 */
+            button, .flex.flex-wrap.gap-2 > button {
+                padding: 0.7rem 1rem !important;
+                font-size: 16px !important;
+                min-height: 44px !important;
+                border-radius: 1.1rem !important;
+            }
+        }
+
+        /* 进一步调整小屏幕下的显示 */
+        @media (max-width: 480px) {
+            .sidebar {
+                display: block !important;
+            }
+
+            .main-content {
+                flex-direction: column !important;
+            }
+
+            .toggle-sidebar-button {
+                font-size: 22px !important;
+                padding: 1rem !important;
+                min-width: 48px !important;
+                min-height: 48px !important;
+            }
+
+            .card {
+                width: 100% !important;
+                padding: 1rem !important;
+                box-sizing: border-box;
+                margin-bottom: 0.8rem !important;
+            }
+
+            /* 调整图表和卡片的显示 */
+            .chart-container {
+                height: 180px !important;
+                width: 100% !important;
+            }
+
+            #radarChart {
+                height: 180px !important;
+            }
+
+            /* 调整字体和按钮大小 */
+            button {
+                font-size: 14px !important;
+                padding: 0.6rem 1rem !important;
+            }
+        }
