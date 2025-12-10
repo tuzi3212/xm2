@@ -75,16 +75,21 @@
             width: 100%;
             max-width: 600px;
             margin: 0 auto;
-            height: 320px;
-            max-height: 400px;
+            aspect-ratio: 1 / 1;
+            min-height: 240px;
+            max-height: 460px;
             min-width: 0;
             box-sizing: border-box;
-            overflow-x: auto;
+            overflow: hidden;
             transition: height 0.33s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.45s cubic-bezier(0.4,0,0.2,1);
             display: flex;
             align-items: center;
             justify-content: center;
             will-change: height, box-shadow;
+        }
+        #radarChart {
+            width: 100%;
+            height: 100%;
         }
         .card, .bg-white.p-5.rounded-2xl, .bg-white.p-6.rounded-2xl, .bg-amber-50\/50.p-6.rounded-2xl {
             margin: 1rem 0;
@@ -316,14 +321,11 @@
 
             /* 优化雷达图容器 */
             .chart-container {
-                height: 220px !important;
                 width: 100% !important;
                 margin-top: 1.5rem !important;
-            }
-
-            #radarChart {
-                width: 100% !important;
-                height: 220px !important;
+                aspect-ratio: 1 / 1 !important;
+                min-height: 220px !important;
+                max-height: 340px !important;
             }
 
             /* 调整卡片内容 */
@@ -341,23 +343,23 @@
         @media (max-width: 768px) {
             .chart-container {
                 width: 100% !important;
-                height: 200px !important; /* 调整图表高度 */
                 margin-top: 1.5rem !important;
-            }
-            #radarChart {
-                width: 100% !important;
-                height: 200px !important; /* 调整图表高度 */
+                aspect-ratio: 1 / 1 !important;
+                min-height: 200px !important;
+                max-height: 280px !important;
             }
         }
 
         /* 进一步优化手机端小屏显示 */
         @media (max-width: 480px) {
-            .chart-container { height: 120px !important; }
-            #radarChart { height: 120px !important; }
+            .chart-container {
+                min-height: 160px !important;
+                max-height: 240px !important;
+            }
         }
     </style>
 </head>
-<body class="h-screen overflow-hidden">
+<body class="min-h-screen overflow-x-hidden">
 
     <div id="app" class="flex w-full h-full flex-col md:flex-row min-h-0 min-w-0">
 
@@ -857,24 +859,10 @@
                 });
 
         // --- 4. Chart.js Controller ---
-        // 响应式图表自适应宽度与高度（不同屏幕尺寸）
-        const getResponsiveChartSize = () => {
-            // 返回 {width, height}，可根据屏幕宽度自适应
-            const w = window.innerWidth;
-            if (w < 480) return { width: 160, height: 120 };
-            if (w < 768) return { width: 220, height: 200 };
-            if (w < 1024) return { width: 370, height: 220 };
-            return { width: 520, height: 320 };
-        };
         // 统一调整所有城市雷达图显示，确保一致性
         const updateChart = () => {
             const ctx = document.getElementById('radarChart');
             if (!ctx || !selectedCity.value) return;
-
-            // 动态调整canvas大小以适配不同屏幕
-            const { width, height } = getResponsiveChartSize();
-            ctx.width = width;
-            ctx.height = height;
 
             // 保证所有城市的评分顺序和数量一致
             const dataValues = [
@@ -939,7 +927,8 @@
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: false,
+                        maintainAspectRatio: true,
+                        aspectRatio: 1,
                         scales: {
                             r: {
                                 angleLines: { color: '#f5f5f4' },
@@ -1020,13 +1009,6 @@
                     window.addEventListener('resize', () => {
                         // 响应式调整图表大小
                         if (chartInstance) {
-                            // 重新设置canvas尺寸并更新
-                            const ctx = document.getElementById('radarChart');
-                            if (ctx) {
-                                const { width, height } = getResponsiveChartSize();
-                                ctx.width = width;
-                                ctx.height = height;
-                            }
                             chartInstance.resize();
                         }
                         updateSidebarOnResize();
@@ -1053,7 +1035,7 @@
         display: flex;
         width: 100vw;
         height: 100vh;
-        min-height: 0;
+        min-height: 100vh;
         min-width: 0;
         flex-direction: row;
         font-family: 'Inter', sans-serif;
@@ -1070,106 +1052,23 @@
         min-height: 0;
         flex-direction: row;
     }
+    /* 移动端允许页面整体滚动，避免 100vh 限制导致内容被裁切 */
+    @media (max-width: 900px) {
+        body, #app {
+            height: auto;
+            min-height: 100vh;
+            overflow-y: auto;
+        }
+        .main-content {
+            height: auto;
+            min-height: 0;
+            overflow: visible;
+        }
+        .sidebar {
+            min-height: auto;
+        }
+    }
     </style>
 
 </body>
 </html>
-
-        /* 调整布局，确保在小屏幕下主内容区和侧边栏显示正常 */
-        @media (max-width: 768px) {
-            #app {
-                flex-direction: column !important;
-            }
-
-            .sidebar {
-                width: 100% !important;
-                transform: translateX(0) !important;
-                box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08) !important;
-                display: block !important;
-            }
-
-            /* 确保按钮和侧边栏在小屏幕下能够显示 */
-            .toggle-sidebar-button {
-                display: block !important;
-                font-size: 24px !important;
-                padding: 1rem !important;
-                min-width: 50px !important;
-                min-height: 50px !important;
-            }
-
-            /* 主内容区调整为列布局 */
-            .main-content {
-                flex-direction: column !important;
-                padding-bottom: 1.5rem !important;
-                overflow-y: auto !important;
-            }
-
-            /* 优化卡片和图表容器的大小 */
-            .chart-container, .card {
-                width: 100% !important;
-                margin-bottom: 1rem !important;
-                padding: 1rem !important;
-                box-sizing: border-box;
-            }
-
-            /* 优化雷达图的显示 */
-            #radarChart {
-                width: 100% !important;
-                height: 220px !important;
-            }
-
-            /* 调整排名的列表显示 */
-            .flex-1 {
-                flex: 1 !important;
-                overflow-y: auto !important;
-            }
-
-            /* 优化各个按钮的尺寸 */
-            button, .flex.flex-wrap.gap-2 > button {
-                padding: 0.7rem 1rem !important;
-                font-size: 16px !important;
-                min-height: 44px !important;
-                border-radius: 1.1rem !important;
-            }
-        }
-
-        /* 进一步调整小屏幕下的显示 */
-        @media (max-width: 480px) {
-            .sidebar {
-                display: block !important;
-            }
-
-            .main-content {
-                flex-direction: column !important;
-            }
-
-            .toggle-sidebar-button {
-                font-size: 22px !important;
-                padding: 1rem !important;
-                min-width: 48px !important;
-                min-height: 48px !important;
-            }
-
-            .card {
-                width: 100% !important;
-                padding: 1rem !important;
-                box-sizing: border-box;
-                margin-bottom: 0.8rem !important;
-            }
-
-            /* 调整图表和卡片的显示 */
-            .chart-container {
-                height: 180px !important;
-                width: 100% !important;
-            }
-
-            #radarChart {
-                height: 180px !important;
-            }
-
-            /* 调整字体和按钮大小 */
-            button {
-                font-size: 14px !important;
-                padding: 0.6rem 1rem !important;
-            }
-        }
